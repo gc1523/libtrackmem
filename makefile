@@ -19,10 +19,13 @@ TEST_EXEC = test_trackmem
 
 PREFIX ?= /usr/local
 INCLUDEDIR = $(PREFIX)/include
+LIBDIR = $(PREFIX)/lib
 
 install:
 	mkdir -p $(INCLUDEDIR)
 	cp include/trackmem.h $(INCLUDEDIR)
+	mkdir -p $(LIBDIR)
+	cp libtrackmem.a $(LIBDIR)
 
 uninstall:
 	rm -f $(INCLUDEDIR)/trackmem.h
