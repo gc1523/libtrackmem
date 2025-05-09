@@ -1,4 +1,4 @@
-### LIBTRACKMEM - A Lightweight Runtime Memory Access Tracker for C/C++
+### LIBTRACKMEM - Lightweight Runtime Memory Access Tracking for C/C++
 
 Quick Start:
 
