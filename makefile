@@ -21,15 +21,7 @@ PREFIX ?= /usr/local
 INCLUDEDIR = $(PREFIX)/include
 LIBDIR = $(PREFIX)/lib
 
-install:
-	mkdir -p $(INCLUDEDIR)
-	cp include/trackmem.h $(INCLUDEDIR)
-	mkdir -p $(LIBDIR)
-	cp libtrackmem.a $(LIBDIR)
-
-uninstall:
-	rm -f $(INCLUDEDIR)/trackmem.h
-
+.PHONY: all clean install uninstall
 
 all: $(TARGET) $(TEST_EXEC)
 
@@ -37,7 +29,17 @@ $(TARGET): $(OBJ)
 	ar rcs $@ $^
 
 $(TEST_EXEC): $(TEST_SRC) $(TARGET)
-	$(CC) $(CFLAGS) -o $@ $^ 
+	$(CC) $(CFLAGS) -o $@ $^
+
+install: $(TARGET)
+	mkdir -p $(INCLUDEDIR)
+	cp include/trackmem.h $(INCLUDEDIR)
+	mkdir -p $(LIBDIR)
+	cp $(TARGET) $(LIBDIR)
+
+uninstall:
+	rm -f $(INCLUDEDIR)/trackmem.h
+	rm -f $(LIBDIR)/$(TARGET)
 
 clean:
 	rm -f $(OBJ) $(TARGET) $(TEST_EXEC)
