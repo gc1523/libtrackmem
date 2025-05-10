@@ -59,11 +59,19 @@ void test_leak_detection() {
     printf("Passed test_leak_detection. (Check log output for leak report.)\n");
 }
 
+void test_free_untracked() {
+    printf("Running test_free_untracked...\n");
+    void* untracked = (void *) 0xdeadbeef;
+    free(untracked);
+    printf("Passed test_free_untracked.\n");
+}
+
 int main() {
     test_malloc_free();
     test_calloc_free();
     test_realloc();
     test_leak_detection();
+    test_free_untracked();
     printf("All tests passed.\n");
     return 0;
 }

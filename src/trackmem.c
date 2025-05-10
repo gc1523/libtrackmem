@@ -40,7 +40,7 @@ static void add_record(void *ptr, size_t size, const char *file, int line, const
   allocations = record;
 }
 
-static void remove_record(void *ptr) {
+static void remove_record(void *ptr, const char *file, int line, const char *func) {
   allocation_record *current = allocations;
   allocation_record *prev = NULL;
   while (current) {
@@ -56,7 +56,7 @@ static void remove_record(void *ptr) {
       prev = current;
       current = current->next;
   }
-  fprintf(stderr, "Attempting to free untracked memory: %p\n", ptr);
+  fprintf(stderr, "Attempting to free untracked memory(%p) at %s:%i in %s \n", ptr, file, line, func);
 }
 
 static allocation_record *find_record(void *ptr) {
@@ -225,9 +225,14 @@ void * t_realloc(void *ptr, size_t size, const char *file, int line, const char 
  */
 void t_free(void *ptr, const char *file, int line, const char *func) {
   if (init) {
-    fprintf(log_file, "free(%p) at %s:%d in %s\n", ptr, file, line, func);
-    remove_record(ptr);
-    free(ptr);
+    allocation_record *record = find_record(ptr);
+    if(!record) {
+      fprintf(log_file, "Attempting to free untracked memory(%p) at %s:%i in %s \n", ptr, file, line, func);
+    } else {
+      fprintf(log_file, "free(%p) at %s:%d in %s\n", ptr, file, line, func);
+      remove_record(ptr, file, line, func);
+      free(ptr);
+    }
   } else {
     free(ptr);
   } 
