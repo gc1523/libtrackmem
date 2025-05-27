@@ -17,57 +17,68 @@ typedef struct allocation_record {
 #define YELLOW  "\x1b[33m"
 #define GREEN   "\x1b[32m"
 
-static allocation_record *allocations = NULL;
+#define HASH_TABLE_SIZE 4096
+
+static allocation_record *alloc_table[HASH_TABLE_SIZE];
+
 FILE *log_file = NULL;
 char * log_file_name = "trackmem.log";
 bool init = false;
 long long total_allocs = 0;
 
+static size_t hash_ptr(void *ptr) {
+    return ((size_t)ptr) % HASH_TABLE_SIZE;
+}
+
 static void add_record(void *ptr, size_t size, const char *file, int line, const char *func) {
-  allocation_record *record = malloc(sizeof(allocation_record));
-  if (!record) {
-      fprintf(stderr, "Failed to allocate memory for allocation record.\n");
-      exit(EXIT_FAILURE);
-  }
-  record->ptr = ptr;
-  record->size = size;
-  strncpy(record->file, file, sizeof(record->file) - 1);
-  record->file[sizeof(record->file) - 1] = '\0';
-  record->line = line;
-  strncpy(record->func, func, sizeof(record->func) - 1);
-  record->func[sizeof(record->func) - 1] = '\0';
-  record->next = allocations;
-  allocations = record;
+    allocation_record *record = malloc(sizeof(allocation_record));
+    if (!record) {
+        fprintf(stderr, "Failed to allocate memory for allocation record.\n");
+        exit(EXIT_FAILURE);
+    }
+    record->ptr = ptr;
+    record->size = size;
+    strncpy(record->file, file, sizeof(record->file) - 1);
+    record->file[sizeof(record->file) - 1] = '\0';
+    record->line = line;
+    strncpy(record->func, func, sizeof(record->func) - 1);
+    record->func[sizeof(record->func) - 1] = '\0';
+
+    size_t idx = hash_ptr(ptr);
+    record->next = alloc_table[idx];
+    alloc_table[idx] = record;
 }
 
 static void remove_record(void *ptr, const char *file, int line, const char *func) {
-  allocation_record *current = allocations;
-  allocation_record *prev = NULL;
-  while (current) {
-      if (current->ptr == ptr) {
-          if (prev) {
-              prev->next = current->next;
-          } else {
-              allocations = current->next;
-          }
-          free(current);
-          return;
-      }
-      prev = current;
-      current = current->next;
-  }
-  fprintf(stderr, "Attempting to free untracked memory(%p) at %s:%i in %s \n", ptr, file, line, func);
+    size_t idx = hash_ptr(ptr);
+    allocation_record *current = alloc_table[idx];
+    allocation_record *prev = NULL;
+    while (current) {
+        if (current->ptr == ptr) {
+            if (prev) {
+                prev->next = current->next;
+            } else {
+                alloc_table[idx] = current->next;
+            }
+            free(current);
+            return;
+        }
+        prev = current;
+        current = current->next;
+    }
+    fprintf(stderr, "Attempting to free untracked memory(%p) at %s:%i in %s \n", ptr, file, line, func);
 }
 
 static allocation_record *find_record(void *ptr) {
-  allocation_record *current = allocations;
-  while (current) {
-      if (current->ptr == ptr) {
-          return current;
-      }
-      current = current->next;
-  }
-  return NULL;
+    size_t idx = hash_ptr(ptr);
+    allocation_record *current = alloc_table[idx];
+    while (current) {
+        if (current->ptr == ptr) {
+            return current;
+        }
+        current = current->next;
+    }
+    return NULL;
 }
 
 void trackmem_init() {
@@ -257,26 +268,28 @@ void clean_up (void) {
   if (!init) {
       return;
   }
-  allocation_record *current = allocations;
   int leak_count = 0;
-  while (current) {
-      leak_count++;
-      fprintf(log_file, "Memory leak detected: %p allocated at %s:%d in %s, size: %zu\n",
-              current->ptr, current->file, current->line, current->func, current->size);
-      print_backtrace(log_file);
-      printf(RED "Memory leak detected: %p allocated at %s:%d in %s, size: %zu\n",
-                current->ptr, current->file, current->line, current->func, current->size);
-        
-      allocation_record *temp = current;
-      current = current->next;
-      free(temp);
-  }
-  printf(YELLOW "\n======== trackmem Summary ========\n");
-  printf("Total allocations: %lld\n", total_allocs);
-  printf("Leaks detected   : %d\n", leak_count);
-  printf("Log file written to: " GREEN "%s\n", log_file_name);
+  for (size_t i = 0; i < HASH_TABLE_SIZE; ++i) {
+        allocation_record *current = alloc_table[i];
+        while (current) {
+            leak_count++;
+            fprintf(log_file, "Memory leak detected: %p allocated at %s:%d in %s, size: %zu\n",
+                    current->ptr, current->file, current->line, current->func, current->size);
+            print_backtrace(log_file);
+            printf(RED "Memory leak detected: %p allocated at %s:%d in %s, size: %zu\n",
+                      current->ptr, current->file, current->line, current->func, current->size);
 
-  fclose(log_file);
+            allocation_record *temp = current;
+            current = current->next;
+            free(temp);
+        }
+    }
+    printf(YELLOW "\n======== trackmem Summary ========\n");
+    printf("Total allocations: %lld\n", total_allocs);
+    printf("Leaks detected   : %d\n", leak_count);
+    printf("Log file written to: " GREEN "%s\n", log_file_name);
+
+    fclose(log_file);
 }
 /**
  * @brief Constructor function to initialize the library.
